@@ -1,0 +1,55 @@
+﻿<UserControl x:Class="EpisodeGrabber.Controls.Main.ImageViewer"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+			 xmlns:commands="clr-namespace:EpisodeGrabber.Controls.Main"
+			 xmlns:classes="clr-namespace:EpisodeGrabber.Classes"
+			 d:DesignHeight="500" d:DesignWidth="900"
+             mc:Ignorable="d">
+	<UserControl.CommandBindings>
+		<CommandBinding Command="commands:ImageViewer.SetPosterImage" CanExecute="SetPosterImage_CanExecute" Executed="SetPosterImage_Execute" />
+	</UserControl.CommandBindings>
+	<UserControl.Resources>
+		<classes:ImageToThumbnailPathConverter x:Key="imageToThumbnailPathConverter" />
+	</UserControl.Resources>
+	<ListView Name="listMovieImages" ItemsSource="{Binding}" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Visible">
+		<ListView.ItemsPanel>
+			<ItemsPanelTemplate>
+				<WrapPanel Orientation="Horizontal"></WrapPanel>
+			</ItemsPanelTemplate>
+		</ListView.ItemsPanel>
+		<ListView.ItemTemplate>
+			<DataTemplate>
+				<StackPanel Orientation="Vertical">
+					<StackPanel.ContextMenu>
+						<ContextMenu Name="treeContext">
+							<MenuItem Header="Set as Poster Image" Command="commands:ImageViewer.SetPosterImage"></MenuItem>
+							<MenuItem Header="Clear Metadata" />
+						</ContextMenu>
+					</StackPanel.ContextMenu>
+					<Image Source="{Binding Converter={StaticResource imageToThumbnailPathConverter}}" MaxHeight="200" MaxWidth="200" Margin="5" />
+					<StackPanel Orientation="Horizontal" Width="200" Background="#EEE">
+						<TextBlock>
+							<TextBlock.Text>
+								<MultiBinding StringFormat="{}Dimensions: {0} x {1}">
+									<Binding Path="Height" />
+									<Binding Path="Width" />
+								</MultiBinding>
+							</TextBlock.Text>
+						</TextBlock>
+					</StackPanel>
+					<StackPanel Orientation="Horizontal" Width="200" Background="#EEE">
+						<TextBlock>
+							<TextBlock.Text>
+								<MultiBinding StringFormat="{}Type: {0}">
+									<Binding Path="MappedType" />
+								</MultiBinding>
+							</TextBlock.Text>
+						</TextBlock>
+					</StackPanel>
+				</StackPanel>
+			</DataTemplate>
+		</ListView.ItemTemplate>
+	</ListView>
+</UserControl>

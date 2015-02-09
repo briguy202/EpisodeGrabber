@@ -1,0 +1,772 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using CommonLibrary.Framework;
+using CommonLibrary.Framework.Tracing;
+using CommonLibrary.Framework.Validation;
+using EpisodeGrabber.Library;
+using EpisodeGrabber.Library.DAO;
+using EpisodeGrabber.Library.Entities;
+
+namespace EpisodeGrabber {
+	/// <summary>
+	/// Interaction logic for MainWindow.xaml
+	/// </summary>
+	public partial class MainWindow : Window {
+
+		#region Commands
+		public static RoutedUICommand OpenContainingFolder = new RoutedUICommand("Opens a containing folder", "OpenContainingFolder", typeof(MainWindow));
+		public static RoutedUICommand Download = new RoutedUICommand("Downloads a show", "Download", typeof(MainWindow), new InputGestureCollection() { new KeyGesture(Key.D, ModifierKeys.Control) });
+		public static RoutedUICommand DownloadBackdrops = new RoutedUICommand("DownloadBackdrops", "DownloadBackdrops", typeof(MainWindow));
+		public static RoutedUICommand CancelDownloadBackdrops = new RoutedUICommand("CancelDownloadBackdrops", "CancelDownloadBackdrops", typeof(MainWindow));
+		public static RoutedUICommand RefreshCommand = new RoutedUICommand("Refreshes all tree nodes", "Refresh", typeof(MainWindow), new InputGestureCollection() { new KeyGesture(Key.F5) });
+		public static RoutedUICommand FetchMetadata = new RoutedUICommand("FetchMetadata", "FetchMetadata", typeof(MainWindow));
+		public static RoutedUICommand ClearMetadata = new RoutedUICommand("ClearMetadata", "ClearMetadata", typeof(MainWindow));
+		public static RoutedUICommand MoveDownloadedFiles = new RoutedUICommand("MoveDownloadedFiles", "MoveDownloadedFiles", typeof(MainWindow), new InputGestureCollection() { new KeyGesture(Key.F8) });
+		public static RoutedUICommand ClearLog = new RoutedUICommand("ClearLog", "ClearLog", typeof(MainWindow));
+		public static RoutedUICommand OpenDownloadFolder = new RoutedUICommand("OpenDownloadFolder", "OpenDownloadFolder", typeof(MainWindow));
+		public static RoutedUICommand CreateFiles = new RoutedUICommand("CreateFiles", "CreateFiles", typeof(MainWindow));
+		#endregion
+
+		#region Declarations
+		private UserConfiguration _configuration;
+		private BackgroundWorker _imageWorker;
+		private BackgroundWorker _sharedWorker;
+		private bool _isBusy = false;
+		private object _lockObject = new object();
+		private delegate void LogMessageDelegate(string message, SolidColorBrush textColor, bool bold);
+		#endregion
+
+		#region Constructor
+		public MainWindow() {
+			InitializeComponent();
+
+			TraceManager.TraceWritten += new TraceManager.TraceWrittenEventHandler(TraceManager_TraceWritten);
+
+			_imageWorker = new BackgroundWorker();
+			_imageWorker.WorkerSupportsCancellation = true;
+			_imageWorker.WorkerReportsProgress = false;
+			_imageWorker.DoWork += new DoWorkEventHandler(this.ImageWorker_DoWork);
+			_imageWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(ImageWorker_RunWorkerCompleted);
+
+			_sharedWorker = new BackgroundWorker();
+			_sharedWorker.WorkerSupportsCancellation = true;
+			_sharedWorker.WorkerReportsProgress = true;
+
+			TraceManager.TraceFormat("User config file: {0}", UserConfiguration.GetSettingsFilePath());
+
+			this.Refresh();
+		}
+		#endregion
+
+		#region Methods
+		private bool IsEntitySelected() {
+			return this.GetSelectedObject() is IEntity;
+		}
+
+		private bool IsShowSelected() {
+			return this.GetSelectedObject() is Show;
+		}
+
+		private bool IsEpisodeSelected() {
+			return this.GetSelectedObject() is Episode;
+		}
+
+		private bool IsRootNodeSelected() {
+			TreeViewItem item = (TreeViewItem)this.treeView1.SelectedItem;
+			bool isRoot = this.GetRootNodes().Contains(item);
+			return isRoot;
+		}
+
+		private List<TreeViewItem> GetRootNodes() {
+			List<TreeViewItem> items = new List<TreeViewItem>() {
+				this.nodeShows,
+				this.nodeMovies
+			};
+
+			return items;
+		}
+
+		private bool IsMissingShowSelected() {
+			bool value = false;
+			if (this.treeView1 != null && this.treeView1.SelectedItem != null) {
+				TreeViewItem item = (TreeViewItem)this.treeView1.SelectedItem;
+				value = item.Tag != null && item.Tag is Show && ((Show)item.Tag).ID == 0;
+			}
+			return value;
+		}
+
+		private List<string> GetExpandedNodes(TreeViewItem node) {
+			List<string> expanded = new List<string>();
+			foreach (TreeViewItem childNode in node.Items) {
+				if (childNode.IsExpanded && childNode.Tag is IEntity) {
+					expanded.Add(((IEntity)childNode.Tag).UniqueID);
+					expanded.AddRange(this.GetExpandedNodes(childNode));
+				}
+			}
+			return expanded;
+		}
+
+		private List<string> GetExpandedNodes(List<TreeViewItem> nodes) {
+			List<string> expanded = new List<string>();
+			foreach (TreeViewItem node in nodes) {
+				expanded.AddRange(this.GetExpandedNodes(node));
+			}
+			return expanded;
+		}
+
+		private void Refresh() {
+			_configuration = UserConfiguration.GetConfiguration();
+			this.Refresh(_configuration);
+		}
+
+		private void Refresh(UserConfiguration configuration) {
+			// Save expanded nodes
+			List<string> expandedIDs = this.GetExpandedNodes(this.GetRootNodes());
+			TraceManager.Trace(string.Format("Found {0} expanded nodes.", expandedIDs.Count.ToString()), TraceVerbosity.Verbose);
+
+			this.GetRootNodes().ForEach((node) => node.Items.Clear());
+
+			if (configuration.TraceVerbosity >= 0) {
+				TraceManager.SetVerbosity(configuration.TraceVerbosity);
+			}
+
+			if (configuration.ScanFolders != null && configuration.ScanFolders.Count > 0) {
+				foreach (string folder in configuration.ScanFolders) {
+					TraceManager.TraceFormat("Scanning folder {0} for movies and shows.", folder);
+
+					DirectoryInfo directory = new DirectoryInfo(folder);
+					if (directory.Exists) {
+						List<EntityBase> entities = null;
+						try {
+							entities = EntityBase.ScanDirectory(directory.FullName);
+						} catch (Exception ex) {
+							TraceManager.Trace(new TraceManager.TraceWrittenEventArgs() {
+								Type = TraceTypes.Exception,
+								Data = ex
+							});
+						}
+
+						if (!entities.IsNullOrEmpty()) {
+							foreach (EntityBase entity in entities) {
+								this.AddEntityToTree(entity, expandedIDs);
+							}
+						}
+					} else {
+						TraceManager.TraceFormat("Directory '{0}' does not exist", folder);
+					}
+				}
+			} else {
+				TraceManager.Trace("Unable to find any scan folders in the user configuration.  Set them up by going to Options in the menu.");
+			}
+		}
+
+		private void AddEntityToTree(EntityBase entity, List<string> expandedIDs) {
+			ValidationUtility.ThrowIfNullOrEmpty(entity.Name, "entity name");
+
+			bool showDownloadedAllExistng = true;
+			string nameID = System.Text.RegularExpressions.Regex.Replace(entity.Name, "[^a-zA-Z0-9]", "");
+			nameID = string.Concat("entity_", nameID);
+
+			TreeViewItem entityNode = new TreeViewItem();
+			entityNode.Name = nameID;
+			entityNode.Tag = entity;
+			entityNode.Header = entity.Name;
+
+			if (entity.ID == 0) {
+				entityNode.Foreground = new SolidColorBrush(Colors.LightGray);
+			}
+
+			if (entity is Show) {
+				Show show = (Show)entity;
+				show.Seasons.Sort((a, b) => a.Number.CompareTo(b.Number));
+				foreach (Season season in show.Seasons) {
+					TreeViewItem seasonNode = new TreeViewItem();
+					seasonNode.Tag = season;
+					seasonNode.Name = string.Concat(nameID, "Season", season.Number.ToString());
+					seasonNode.Header = string.Format("Season {0}", season.Number.ToString());
+					this.AddNode(entityNode, seasonNode, expandedIDs);
+
+					season.Episodes.Sort((a, b) => a.EpisodeNumber.CompareTo(b.EpisodeNumber));
+					foreach (Episode episode in season.Episodes.TakeWhile((a) => a.Created > DateTime.MinValue)) {
+						TreeViewItem episodeNode = new TreeViewItem();
+						episodeNode.Tag = episode;
+						episodeNode.Name = string.Concat(nameID, "Episode", episode.EpisodeNumber.ToString());
+						episodeNode.Header = string.Format("{0} - {1}", episode.EpisodeNumber.ToString(), episode.Name);
+
+						if (!string.IsNullOrEmpty(episode.Path)) {
+							// This episode has been downloaded
+							episodeNode.Background = new SolidColorBrush(Colors.Green);
+							episodeNode.Foreground = new SolidColorBrush(Colors.White);
+						} else if (episode.Created < DateTime.Now) {
+							// This episode has not been downloaded and is available.
+						} else {
+							// This episode has not been downloaded but is not yet available.
+							episodeNode.Foreground = new SolidColorBrush(Colors.Gray);
+						}
+
+						this.AddNode(seasonNode, episodeNode, expandedIDs);
+					}
+
+					if (season.DownloadedSomeEpisodes && !season.DownloadedAllExistingEpisodes) {
+						showDownloadedAllExistng = false;
+					}
+
+					if (season.DownloadedAllExistingEpisodes) {
+						// The season has all the available episodes so far
+						seasonNode.Background = new SolidColorBrush(Colors.Green);
+						seasonNode.Foreground = new SolidColorBrush(Colors.White);
+					} else if (season.DownloadedSomeEpisodes) {
+						// The season has some of the episodes, but not all.
+						seasonNode.Background = new SolidColorBrush(Colors.Yellow);
+					} else {
+						// The season has none of the episodes.
+					}
+				}
+
+				if (!showDownloadedAllExistng) {
+					entityNode.Background = new SolidColorBrush(Colors.Yellow);
+				}
+
+				this.AddNode(this.nodeShows, entityNode, expandedIDs);
+			} else {
+				this.AddNode(this.nodeMovies, entityNode, expandedIDs);
+			}
+		}
+
+		private void AddNode(TreeViewItem parent, TreeViewItem node, List<string> expandedIDs) {
+			if (expandedIDs.Contains(((IEntity)node.Tag).UniqueID)) {
+				node.IsExpanded = true;
+			}
+			parent.Items.Add(node);
+		}
+
+		private object GetSelectedObject() {
+			if (this.treeView1 != null && this.treeView1.SelectedItem != null) {
+				return ((TreeViewItem)this.treeView1.SelectedItem).Tag;
+			}
+			return null;
+		}
+
+		private EntityBase GetSelectedEntity() {
+			TreeViewItem item = (TreeViewItem)this.treeView1.SelectedItem;
+			while (item.Tag as EntityBase == null && item.Parent != null && item.Parent is TreeViewItem) {
+				item = (TreeViewItem)item.Parent;
+			}
+
+			EntityBase _return = null;
+			if (item.Tag as EntityBase != null) {
+				_return = (EntityBase)item.Tag;
+			}
+
+			return _return;
+		}
+
+		private List<EntityBase> GetChildEntities() {
+			List<EntityBase> entities = new List<EntityBase>();
+			TreeViewItem selected = (TreeViewItem)this.treeView1.SelectedItem;
+			foreach (TreeViewItem item in selected.Items) {
+				entities.Add((EntityBase)item.Tag);
+			}
+			return entities;
+		}
+
+		private List<Show> GetAllShows() {
+			List<Show> shows = new List<Show>();
+			foreach (TreeViewItem item in this.nodeShows.Items) {
+				shows.Add((Show)item.Tag);
+			}
+			return shows;
+		}
+
+		private void LaunchFolder(string path) {
+			ProcessStartInfo explorerWindow = new ProcessStartInfo();
+			explorerWindow.FileName = "explorer.exe";
+			explorerWindow.Arguments = path;
+			System.Diagnostics.Process.Start(explorerWindow);
+		}
+
+		private void FetchMetaData(IFetchEntity entity) {
+			ValidationUtility.ThrowIfNullOrEmpty(entity, "entity");
+
+			_isBusy = true;
+			TraceManager.Trace(string.Format("Fetching metadata for '{0}'.", fetchName), TraceVerbosity.Minimal, TraceTypes.OperationStarted);
+			string oldFolderPath = entity.Path;
+
+			BackgroundWorker worker = new BackgroundWorker();
+			worker.DoWork += (sender, args) => {
+				BusinessObject<List<EntityBase>> foundEntities = new BusinessObject<List<EntityBase>>();
+				Dictionary<string, object> arguments = (Dictionary<string, object>)args.Argument;
+				IFetchEntity entityParam = (IFetchEntity)arguments["entity"];
+				string fetchNameParam = (string)arguments["fetchName"];
+
+				if (entityParam.ID == 0) {
+					// The entity exists in the user's folder, but hasn't been fetched yet, so go search for the it.
+					TraceManager.TraceFormat("Searching by name for '{0}'.", fetchNameParam);
+					foundEntities = entityParam.FetchMetadata();
+				} else {
+				    // This show has already been fetched, but we're re-fetching it's data.  Since
+				    // we already have the show's ID, we can use that to search on since it is exact.
+				    foundEntities.Data = new List<EntityBase>() { (EntityBase)entityParam };
+				}
+
+				arguments.Add("foundEntities", foundEntities);
+				args.Result = arguments;
+			};
+
+			worker.RunWorkerCompleted += (sender, args) => {
+				Dictionary<string, object> arguments = (Dictionary<string, object>)args.Result;
+				BusinessObject<List<EntityBase>> foundEntities = (BusinessObject<List<EntityBase>>)arguments["foundEntities"];
+				IFetchEntity entityParam = (IFetchEntity)arguments["entity"];
+				string fetchNameParam = (string)arguments["fetchName"];
+
+				if (foundEntities.Errors.IsNullOrEmpty()) {
+					if (foundEntities.Data.IsNullOrEmpty()) {
+						_isBusy = false;
+						TraceManager.Trace("Unable to locate any entity to fetch.");
+					} else {
+						if (foundEntities.Data.Count > 1) {
+							ChooseShow window = new ChooseShow(fetchNameParam, foundEntities.Data);
+							window.BringIntoView();
+							if (window.ShowDialog() == true) {
+								TraceManager.TraceFormat("Selected entity {0}", window.SelectedItem.Name);
+								foundEntities.Data = new List<EntityBase>() { window.SelectedItem };
+							} else {
+								return;
+							}
+						}
+
+						IFetchEntity selectedEntity = (IFetchEntity)foundEntities.Data[0];
+						TraceManager.Trace(string.Format("Fetching metadata by ID '{0}'.", selectedEntity.ID), TraceVerbosity.Minimal, TraceTypes.OperationStarted);
+
+						BackgroundWorker workerByID = new BackgroundWorker();
+						workerByID.DoWork += (sender2, args2) => {
+							int id = (int)args2.Argument;
+							EntityBase finalEntity = selectedEntity.FetchMetadataByID(id).Data;
+							if (finalEntity.ID != 0) {
+								finalEntity.Path = oldFolderPath;
+								finalEntity.Save();
+								finalEntity.CreateFiles(true, _configuration);	// Get all banners, metadata files, etc.
+							}
+						};
+						workerByID.RunWorkerCompleted += (sender2, args2) => {
+							TraceManager.Trace("Fetching metadata complete.", TraceVerbosity.Minimal, TraceTypes.OperationCompleted);
+							_isBusy = false;
+							this.Refresh();
+						};
+						workerByID.RunWorkerAsync(selectedEntity.ID);
+					}
+				} else {
+					foreach (string error in foundEntities.Errors) {
+						TraceManager.Trace(error, TraceTypes.Error);
+					}
+				}
+			};
+
+			Dictionary<string, object> setArguments = new Dictionary<string, object>();
+			setArguments.Add("entity", entity);
+			setArguments.Add("fetchName", fetchName);
+			worker.RunWorkerAsync(setArguments);
+		}
+
+		private void FetchMetaData(IEnumerable<IFetchEntity> entities) {
+			foreach (IFetchEntity entity in entities) {
+				this.FetchMetaData(entity);
+			}
+		}
+
+		private void ClearMetaDataAsync(EntityBase entity) {
+			ValidationUtility.ThrowIfNullOrEmpty(entity, "entity");
+			this.ClearMetaDataAsync(new List<EntityBase>() { entity });
+		}
+
+		private void ClearMetaDataAsync(List<EntityBase> entities) {
+			if (!entities.IsNullOrEmpty() && !_isBusy) {
+				_isBusy = true;
+
+				BackgroundWorker worker = new BackgroundWorker();
+				worker.DoWork += (sender, args) => {
+					Dictionary<string, object> arguments = (Dictionary<string, object>)args.Argument;
+					List<EntityBase> entitiesAsync = (List<EntityBase>)arguments["entities"];
+
+					foreach (EntityBase entity in entitiesAsync) {
+						entity.Delete();
+						TraceManager.Trace(string.Format("Clearing metadata on {0} complete.", entity.Name), TraceVerbosity.Minimal, TraceTypes.OperationCompleted);
+					}
+
+					// Reload the UI.
+					this.treeView1.Dispatcher.BeginInvoke(new Action(() => this.Refresh()));
+				};
+
+				worker.RunWorkerCompleted += (sender, args) => {
+					_isBusy = false;
+				};
+
+				Dictionary<string, object> setArguments = new Dictionary<string, object>();
+				setArguments.Add("entities", entities);
+				worker.RunWorkerAsync(setArguments);
+			}
+		}
+
+		private void MoveFilesAsync(List<Show> allShows) {
+			BackgroundWorker worker = new BackgroundWorker();
+			worker.DoWork += (sender, args) => {
+				Dictionary<string, object> arguments = (Dictionary<string, object>)args.Argument;
+				List<Show> allShowsAsync = (List<Show>)arguments["allShows"];
+				DirectoryInfo directory = new DirectoryInfo(_configuration.DownloadFolder);
+				List<FileInfo> files = directory.GetFiles("*.*").Where((f) => f.Extension.EndsWith(".avi") || f.Extension.EndsWith(".mpg")).ToList();
+				bool foundShowToMove = false;
+
+				foreach (Show show in allShowsAsync) {
+					FileInfo moveFile = null;
+					List<string> parts = show.Name.Split(' ').ToList();
+
+					foreach (FileInfo file in files) {
+						int partsCount = 0;
+						int matchCount = 0;
+
+						foreach (string part in parts) {
+							partsCount++;
+							if (file.Name.ToLower().Contains(part.ToLower())) {
+								matchCount++;
+							}
+						}
+
+						double matchPercent = ((double)matchCount / (double)partsCount) * 100;
+						if (matchPercent > 50) {
+							moveFile = file;
+							TraceManager.TraceFormat("Show {0} matches {1} at {2} percent", show.Name, file.Name, matchPercent.ToString());
+						}
+					}
+
+					if (moveFile != null) {
+						foundShowToMove = true;
+						Match match = Regex.Match(moveFile.FullName, "S(\\d{2})", RegexOptions.IgnoreCase);
+						if (match.Success) {
+							string seasonValue = match.Groups[1].Value;
+							Season season = show.Seasons.FirstOrDefault((s) => s.Number == int.Parse(seasonValue));
+
+							if (season != null) {
+								if (string.IsNullOrEmpty(season.Path)) {
+									string createDirectoryPath = System.IO.Path.Combine(season.Parent.Path, string.Concat("Season ", season.Number.ToString()));
+									Directory.CreateDirectory(createDirectoryPath);
+									season.Path = createDirectoryPath;
+								}
+
+								string destination = System.IO.Path.Combine(season.Path, moveFile.Name);
+								TraceManager.Trace(string.Format("Moving {0} to {1}", moveFile.FullName, destination), TraceTypes.OperationStarted);
+
+								moveFile.MoveTo(destination);
+								show.Initialize();
+								show.CreateFiles(true, _configuration);
+							} else {
+								TraceManager.TraceFormat("Unable to find the season directory {0} to move {1} to.", season.Path, moveFile.FullName);
+							}
+						} else {
+							TraceManager.TraceFormat("Unable to locate the season this episode should be moved to: {0}", moveFile.FullName);
+						}
+					}
+				}
+
+				if (!foundShowToMove) {
+					TraceManager.TraceFormat("Unable to find any shows to move from {0}.", directory.FullName);
+				}
+			};
+
+			Dictionary<string, object> setArguments = new Dictionary<string, object>();
+			setArguments.Add("allShows", allShows);
+			worker.RunWorkerAsync(setArguments);
+		}
+
+		#region Tracing
+		private void TraceManager_TraceWritten(object sender, TraceManager.TraceWrittenEventArgs e) {
+			switch (e.Type) {
+				case TraceTypes.Exception: this.LogException((Exception)e.Data); break;
+				case TraceTypes.Error: this.LogMessage(e.Message, Brushes.Red, true); break;
+				case TraceTypes.WebRequest: this.LogMessage(e.Message, Brushes.Black, true); break;
+				case TraceTypes.OperationStarted: this.LogMessage(e.Message, Brushes.Black, true); break;
+				case TraceTypes.OperationCompleted: this.LogMessage(e.Message, Brushes.Green, true); break;
+				default: this.LogMessage(e.Message); break;
+			}
+		}
+
+		private void LogException(Exception ex) {
+			StringBuilder sb = new StringBuilder();
+			sb.Append("An exception occurred:\r\n");
+			sb.AppendFormat("Message: {0}\r\n", ex.Message);
+			sb.AppendFormat("Stack: {0}\r\n", ex.StackTrace);
+
+			if (ex.InnerException != null) {
+				sb.AppendFormat("Inner Exception Message: {0}\r\n", ex.InnerException.Message);
+				sb.AppendFormat("Inner Stack: {0}\r\n", ex.InnerException.StackTrace);
+			}
+
+			this.LogMessage(sb.ToString(), Brushes.Red, true);
+		}
+
+		private void LogMessage(string message) {
+			this.LogMessage(message, Brushes.Black, false);
+		}
+
+		private void LogMessage(string message, SolidColorBrush textColor, bool bold) {
+			this.tbxLog.Dispatcher.BeginInvoke((LogMessageDelegate)this.LogMessageAsync, message, textColor, bold);
+		}
+
+		private void LogMessageAsync(string message, SolidColorBrush textColor, bool bold) {
+			Inline text;
+			Run run = new Run(string.Format("> {0}\r\n", message));
+			run.Foreground = textColor;
+			text = run;
+
+			if (bold) {
+				Bold boldedText = new Bold(run);
+				text = boldedText;
+			}
+
+			this.tbxLog.Inlines.Add(text);
+			this.logScroller.ScrollToBottom();
+		}
+		#endregion
+		#endregion
+
+		#region Events
+		private void TreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e) {
+			if (e.Source is TreeView) {
+				TreeViewItem selected = ((TreeView)e.Source).SelectedItem as TreeViewItem;
+				if (selected != null) {
+					EntityBase entity = this.GetSelectedEntity();
+					if (entity != null) {
+						TraceManager.Trace(string.Format("Selected entity {0}.", entity.Name), TraceVerbosity.Verbose);
+
+						if (entity is Movie) {
+							this.movieForm.Visibility = System.Windows.Visibility.Visible;
+							this.tvForm.Visibility = System.Windows.Visibility.Hidden;
+							this.movieForm.DataContext = entity;
+						} else {
+							this.movieForm.Visibility = System.Windows.Visibility.Hidden;
+							this.tvForm.Visibility = System.Windows.Visibility.Visible;
+							this.tvForm.DataContext = entity;
+						}
+					}
+				}
+			}
+		}
+
+		private void FetchMetadata_Execute(object sender, ExecutedRoutedEventArgs e) {
+			IFetchEntity entity = this.GetSelectedEntity() as IFetchEntity;
+			if (entity != null) {
+				this.FetchMetaData((IFetchEntity)entity);
+			} else if (this.IsRootNodeSelected()) {
+				this.FetchMetaData(this.GetChildEntities().OfType<IFetchEntity>());
+			}
+		}
+
+		private void ClearMetadata_Execute(object sender, ExecutedRoutedEventArgs e) {
+			EntityBase entity = this.GetSelectedEntity();
+			if (entity != null) {
+				this.ClearMetaDataAsync(entity);
+			} else if (this.IsRootNodeSelected()) {
+				this.ClearMetaDataAsync(this.GetChildEntities());
+			}
+		}
+
+		private void FetchMetadata_CanExecute(object sender, CanExecuteRoutedEventArgs e) {
+			e.CanExecute = this.treeView1 != null && !_isBusy && (this.GetSelectedObject() is IFetchEntity || this.IsRootNodeSelected() || this.IsMissingShowSelected());
+		}
+
+		private void ClearMetadata_CanExecute(object sender, CanExecuteRoutedEventArgs e) {
+			e.CanExecute = this.treeView1 != null && !_isBusy && ((this.GetSelectedEntity() != null && this.GetSelectedEntity().ID > 0) || this.IsRootNodeSelected());
+		}
+
+		private void Refresh_Execute(object sender, ExecutedRoutedEventArgs e) {
+			this.Refresh();
+		}
+
+		private void MenuOptions_OpenOptions(object sender, RoutedEventArgs e) {
+			OptionsWindow window = new OptionsWindow();
+			window.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
+			if (window.ShowDialog() == true) {
+				
+			}
+		}
+
+		private void MenuOptions_OpenConfigurationFile(object sender, RoutedEventArgs e) {
+			this.LaunchFolder(UserConfiguration.GetSettingsFilePath());
+		}
+
+		private void Save_Executed(object sender, ExecutedRoutedEventArgs e) {
+			_configuration.Save();
+		}
+
+		private void TreeView_MouseRightButtonDown(object sender, MouseButtonEventArgs e) {
+			e.Handled = true;
+			if (e.Source is TreeViewItem) {
+				((TreeViewItem)e.Source).IsSelected = true;
+			}
+		}
+
+		private void OpenContainingFolder_CanExecute(object sender, CanExecuteRoutedEventArgs e) {
+			EntityBase entity = this.GetSelectedEntity();
+			if (entity != null) {
+				string folderPath = entity.Path;
+				e.CanExecute = (entity != null && !string.IsNullOrEmpty(folderPath));
+			}
+		}
+
+		private void OpenContainingFolder_Execute(object sender, ExecutedRoutedEventArgs e) {
+			TreeViewItem item = this.treeView1.SelectedItem as TreeViewItem;
+			EntityBase entity = this.GetSelectedEntity();
+			string folderPath = entity.Path;
+
+			if (item.Tag is Season) {
+				Season season = (Season)item.Tag;
+				if (!string.IsNullOrEmpty(season.Path)) {
+					folderPath = season.Path;
+				}
+			} else if (item.Tag is Episode) {
+				Episode episode = (Episode)item.Tag;
+				if (!string.IsNullOrEmpty(episode.Path)) {
+					folderPath = episode.Path;
+				}
+			}
+
+			if (!string.IsNullOrEmpty(folderPath)) {
+				ProcessStartInfo explorerWindow = new ProcessStartInfo();
+				explorerWindow.FileName = "explorer.exe";
+				explorerWindow.Arguments = folderPath;
+				Process.Start(explorerWindow);
+			}
+		}
+
+		private void Download_Execute(object sender, ExecutedRoutedEventArgs e) {
+			Episode episode = this.GetSelectedObject() as Episode;
+			if (episode != null) {
+				Season season = episode.Parent as Season;
+				Show show = season.Parent as Show;
+
+				string downloadString = _configuration.DownloadFormat;
+				downloadString = downloadString.Replace("{SHOW_NAME}", show.Name);
+				downloadString = downloadString.Replace("{SEASON_NUMBER}", String.Format("{0:00}", season.Number));
+				downloadString = downloadString.Replace("{EPISODE_NUMBER}", String.Format("{0:00}", episode.EpisodeNumber));
+				downloadString = downloadString.Replace(' ', '+');
+
+				string url = string.Format("http://www.filestube.com/search.html?q={0}&select=All", downloadString);
+				Process.Start(url);
+			}
+		}
+
+		private void DownloadBackdrops_CanExecute(object sender, CanExecuteRoutedEventArgs e) {
+			e.CanExecute = (this.GetSelectedEntity() != null && !_imageWorker.IsBusy);
+		}
+
+		private void DownloadBackdrops_Execute(object sender, ExecutedRoutedEventArgs e) {
+			EntityBase entity = this.GetSelectedEntity();
+			if (entity != null) {
+				List<Library.Entities.Image> images = new List<Library.Entities.Image>(entity.Images.Where((a) => a.MappedType == ImageType.FanArt));
+				if (images.Count > 0) {
+					// First check to see if there is an images file from a previous pull of background images.
+					this.menuDownloadBackdrops.Visibility = System.Windows.Visibility.Collapsed;
+					this.menuCancelDownloadBackdrops.Visibility = System.Windows.Visibility.Visible;
+
+					// Now start the background thread to get the images.
+					_imageWorker.RunWorkerAsync(new List<object>() { images, entity });
+				}
+			}
+		}
+
+		private void CancelDownloadBackdrops_Execute(object sender, ExecutedRoutedEventArgs e) {
+			this.LogMessage("Cancelling current operation, please wait ...");
+			_imageWorker.CancelAsync();
+		}
+
+		private void ImageWorker_DoWork(object sender, DoWorkEventArgs e) {
+			List<object> args = (List<object>)e.Argument;
+			List<Library.Entities.Image> images = (List<Library.Entities.Image>)args[0];
+			Show show = (Show)args[1];
+			int count = 0;
+			this.tbxLog.Dispatcher.BeginInvoke(new Action(() => TraceManager.TraceFormat("{0} backdrops found, beginning download ...", images.Count.ToString())), null);
+
+			foreach (Library.Entities.Image image in images) {
+				if (_imageWorker.CancellationPending) {
+					this.tbxLog.Dispatcher.BeginInvoke(new Action(() => TraceManager.TraceFormat("Operation cancelled.", images.Count.ToString())), null);
+					e.Cancel = true;
+					return;
+				}
+
+				string filename = string.Format("{0}\\backdrop{1}.jpg", show.Path, (count == 0) ? "" : count.ToString());
+				filename = filename.ReplaceInvalidPathCharacters(string.Empty);
+				this.tbxLog.Dispatcher.BeginInvoke(new Action(() => TraceManager.TraceFormat("Downloading backdrop {0} of {1} - {2}...", (count + 1).ToString(), images.Count.ToString(), filename)), null);
+				EpisodeService.DownloadImage(image.URL, filename);
+				lock (_lockObject) {
+					EpisodeService.AddToImagesFile(show.Path, image, filename);
+				}
+				count++;
+			}
+		}
+
+		private void ImageWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e) {
+			this.menuCancelDownloadBackdrops.Visibility = System.Windows.Visibility.Collapsed;
+			this.menuDownloadBackdrops.Visibility = System.Windows.Visibility.Visible;
+		}
+
+		private void ShowSelected_CanExecute(object sender, CanExecuteRoutedEventArgs e) {
+			e.CanExecute = this.IsShowSelected();
+		}
+
+		private void EpisodeSelected_CanExecute(object sender, CanExecuteRoutedEventArgs e) {
+			e.CanExecute = this.IsEpisodeSelected();
+		}
+
+		private void ShowEntitySelected_CanExecute(object sender, CanExecuteRoutedEventArgs e) {
+			e.CanExecute = this.GetSelectedObject() is IEntity;
+		}
+
+		private void MoveDownloadedFiles_CanExecute(object sender, CanExecuteRoutedEventArgs e) {
+			e.CanExecute = !string.IsNullOrEmpty(_configuration.DownloadFolder);
+		}
+
+		private void MoveDownloadedFiles_Execute(object sender, ExecutedRoutedEventArgs e) {
+			this.MoveFilesAsync(this.GetAllShows());
+		}
+
+		private void ClearLog_Execute(object sender, ExecutedRoutedEventArgs e) {
+			this.tbxLog.Text = string.Empty;
+		}
+
+		private void OpenDownloadFolder_Execute(object sender, ExecutedRoutedEventArgs e) {
+			this.LaunchFolder(_configuration.DownloadFolder);
+		}
+
+		private void SiteClick(object sender, MouseButtonEventArgs e) {
+			TextBlock text = (TextBlock)sender;
+			string url = null;
+			Movie movie = (this.GetSelectedEntity() is Movie) ? (Movie)this.GetSelectedEntity() : null;
+
+			if (movie != null) {
+				switch (text.Tag.ToString()) {
+					case "imdb": url = string.Format("http://www.imdb.com/title/{0}/", movie.IMDB.ID); break;
+					case "rotten": url = string.Format("http://www.imdb.com/title/{0}/", ""); break;
+				}
+				if (!string.IsNullOrWhiteSpace(url)) {
+					Process.Start(url);
+				}
+			}
+		}
+
+		private void CreateFiles_Execute(object sender, ExecutedRoutedEventArgs e) {
+			this.GetSelectedEntity().CreateFiles(true, _configuration);
+		}
+		#endregion
+
+	}
+}

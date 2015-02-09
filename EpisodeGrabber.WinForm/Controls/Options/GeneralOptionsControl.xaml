@@ -1,0 +1,85 @@
+﻿<Options:OptionsControl x:Class="EpisodeGrabber.Controls.Options.GeneralOptionsControl"
+			 xmlns:Options="clr-namespace:EpisodeGrabber.Controls.Options"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+			 xmlns:commands="clr-namespace:EpisodeGrabber.Controls.Options"
+             mc:Ignorable="d" 
+             d:DesignHeight="427" d:DesignWidth="627" Padding="5">
+	<UserControl.CommandBindings>
+		<CommandBinding Command="commands:GeneralOptionsControl.Add" Executed="Add_Executed" />
+		<CommandBinding Command="commands:GeneralOptionsControl.Remove" Executed="Remove_Executed" CanExecute="Remove_CanExecute" />
+		<CommandBinding Command="commands:GeneralOptionsControl.RestoreDefaults" Executed="RestoreDefaults_Executed" CanExecute="RestoreDefaults_CanExecute" />
+		<CommandBinding Command="commands:GeneralOptionsControl.AddMediaType" Executed="AddMediaType_Executed" />
+	</UserControl.CommandBindings>
+	<Grid>
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="Auto" />
+			<ColumnDefinition />
+		</Grid.ColumnDefinitions>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="*" MaxHeight="250"/>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="Auto"/>
+		</Grid.RowDefinitions>
+		<Label Grid.Row="0" Content="Scan Folders" />
+		<ListBox Grid.Row="0" Grid.Column="1" Name="lstScanFolders" SelectionMode="Extended" ScrollViewer.CanContentScroll="True" ScrollViewer.VerticalScrollBarVisibility="Auto" Padding="1">
+			<ListBox.InputBindings>
+				<KeyBinding Key="Insert" Command="commands:GeneralOptionsControl.Add" />
+				<KeyBinding Key="Delete" Command="commands:GeneralOptionsControl.Remove" />
+			</ListBox.InputBindings>
+		</ListBox>
+		<StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="3">
+			<Button Width="75" Name="btnAdd" Content="Add" HorizontalAlignment="Left" Command="commands:GeneralOptionsControl.Add" />
+			<Button Width="75" Name="btnRemove" Content="Remove" Margin="5,0,0,0" HorizontalAlignment="Left" Command="commands:GeneralOptionsControl.Remove" />
+		</StackPanel>
+		<Label Grid.Row="2" Content="Download Folder" />
+		<TextBox Grid.Row="2" Grid.Column="2" Name="tbxDownloadFolder" Style="{StaticResource TextboxStyle}" />
+		<Label Grid.Row="3" Content="Download URL" />
+		<StackPanel Grid.Row="3" Grid.Column="1" Orientation="Vertical">
+			<TextBox Style="{StaticResource TextboxStyle}" Name="tbxDownloadFormat" />
+			<TextBlock TextWrapping="WrapWithOverflow">
+						Allowed Variables:<LineBreak/>
+						<TextBlock TextWrapping="WrapWithOverflow" Margin="10,0">
+							{SHOW_NAME} - The name of the show.<LineBreak/>
+							{EPISODE_NUMBER} - The number of the episode with a leading zero.<LineBreak/>
+							{SEASON_NUMBER} - The number of the season with a leading zero.
+						</TextBlock>
+					</TextBlock>
+		</StackPanel>
+		<Label Grid.Row="4" Content="Tracing" />
+		<StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="3">
+			<RadioButton Name="radTracingMinimal" Content="Minimal" GroupName="tracingRadios" Margin="5" />
+			<RadioButton Name="radTracingDefault" Content="Default" GroupName="tracingRadios" Margin="5" />
+			<RadioButton Name="radTracingVerbose" Content="Verbose" GroupName="tracingRadios" Margin="5" />
+		</StackPanel>
+		<TextBlock Grid.Row="5" Padding="5">
+				Supported Media<LineBreak />Types
+		</TextBlock>
+		<StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal">
+			<ListBox Name="lstSupportedMediaTypes" Height="100" Width="75" ItemsSource="{Binding Path=., Mode=TwoWay}" />
+			<StackPanel Orientation="Vertical">
+				<Grid>
+					<Grid.RowDefinitions>
+						<RowDefinition />
+						<RowDefinition />
+					</Grid.RowDefinitions>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition />
+						<ColumnDefinition />
+					</Grid.ColumnDefinitions>
+					<TextBox Grid.Row="0" Name="tbxMediaType" HorizontalAlignment="Center" Height="25" Width="100" Margin="5,0,0,0" />
+					<StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+						<Button Content="Add" Height="25" Width="75" Margin="5,0,0,0" Command="commands:GeneralOptionsControl.AddMediaType" />
+						<Button Content="Remove" Height="25" Width="75" Margin="5,0,0,0" Command="commands:GeneralOptionsControl.AddMediaType" />
+					</StackPanel>
+					<Button Grid.Row="1" Grid.Column="1" Content="Restore Defaults" Height="25" Width="125" Command="commands:GeneralOptionsControl.RestoreDefaults" Margin="0,5" />
+				</Grid>
+			</StackPanel>
+		</StackPanel>
+	</Grid>
+</Options:OptionsControl>

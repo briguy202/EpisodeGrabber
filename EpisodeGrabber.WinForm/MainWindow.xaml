@@ -1,0 +1,113 @@
+﻿<Window x:Class="EpisodeGrabber.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		xmlns:classes="clr-namespace:EpisodeGrabber.Classes"
+		xmlns:wpf="clr-namespace:CommonLibrary.WPF;assembly=CommonLibrary.WPF"
+		xmlns:commands="clr-namespace:EpisodeGrabber"
+		xmlns:main="clr-namespace:EpisodeGrabber.Controls.Main"
+        Title="MainWindow" Height="550" Width="752" WindowStartupLocation="CenterScreen" WindowState="Maximized">
+	<Window.Resources>
+		<classes:ZeroIntConverter x:Key="ZeroIntConverter" />
+		<classes:MinDateTimeConverter x:Key="MinDateTimeConverter" />
+		<classes:RecursiveBitmapImageConverter x:Key="RecursiveBitmapImageConverter" />
+		<classes:ImageToThumbnailPathConverter x:Key="imageToThumbnailPathConverter" />
+	</Window.Resources>
+	<Window.CommandBindings>
+		<CommandBinding Command="Save" Executed="Save_Executed" />
+		<CommandBinding Command="commands:MainWindow.OpenContainingFolder" CanExecute="OpenContainingFolder_CanExecute" Executed="OpenContainingFolder_Execute" />
+		<CommandBinding Command="commands:MainWindow.Download" CanExecute="EpisodeSelected_CanExecute" Executed="Download_Execute" />
+		<CommandBinding Command="commands:MainWindow.DownloadBackdrops" CanExecute="DownloadBackdrops_CanExecute" Executed="DownloadBackdrops_Execute" />
+		<CommandBinding Command="commands:MainWindow.CancelDownloadBackdrops" Executed="CancelDownloadBackdrops_Execute" />
+        <CommandBinding Command="commands:MainWindow.RefreshCommand" Executed="Refresh_Execute" />
+        <CommandBinding Command="commands:MainWindow.RefreshSelectedCommand" Executed="RefreshSelected_Execute" />
+        <CommandBinding Command="commands:MainWindow.FetchMetadata" Executed="FetchMetadata_Execute" CanExecute="FetchMetadata_CanExecute" />
+		<CommandBinding Command="commands:MainWindow.ClearMetadata" Executed="ClearMetadata_Execute" CanExecute="ClearMetadata_CanExecute" />
+        <CommandBinding Command="commands:MainWindow.MoveDownloadedFiles" Executed="MoveDownloadedFiles_Execute" CanExecute="MoveDownloadedFiles_CanExecute" />
+        <CommandBinding Command="commands:MainWindow.ClearGrabberFiles" Executed="ClearGrabberFiles_Execute" />
+        <CommandBinding Command="commands:MainWindow.ClearLog" Executed="ClearLog_Execute" />
+		<CommandBinding Command="commands:MainWindow.OpenDownloadFolder" Executed="OpenDownloadFolder_Execute" />
+		<CommandBinding Command="commands:MainWindow.CreateFiles" Executed="CreateFiles_Execute" CanExecute="ClearMetadata_CanExecute" />
+	</Window.CommandBindings>
+	<Grid Margin="4">
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="1*"/>
+			<ColumnDefinition Width="Auto"/>
+			<ColumnDefinition Width="2*"/>
+		</Grid.ColumnDefinitions>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="70*" />
+			<RowDefinition Height="30*" />
+		</Grid.RowDefinitions>
+		<Menu Grid.Row="0" Grid.ColumnSpan="3">
+			<MenuItem Header="File" Name="menuFile">
+				<MenuItem Command="ApplicationCommands.Save" Header="Save" />
+			</MenuItem>
+			<MenuItem Header="Tools" Name="menuTools">
+				<MenuItem Header="Options..." Click="MenuOptions_OpenOptions" />
+				<Separator />
+				<MenuItem Header="Open Configuration File" Click="MenuOptions_OpenConfigurationFile" />
+				<MenuItem Header="Open Download Folder" Command="commands:MainWindow.OpenDownloadFolder" />
+				<Separator />
+                <MenuItem Header="Clear Grabber Files" Command="commands:MainWindow.ClearGrabberFiles" />
+                <MenuItem Header="Move Downloaded Files" Command="commands:MainWindow.MoveDownloadedFiles" InputGestureText="F8" />
+                <MenuItem Header="Refresh" Command="commands:MainWindow.RefreshCommand" InputGestureText="F5" />
+			</MenuItem>
+		</Menu>
+		<ToolBarTray Grid.Row="1" Grid.ColumnSpan="3">
+			<ToolBar Band="0" BandIndex="0">
+				<Button Command="commands:MainWindow.FetchMetadata" Style="{StaticResource ButtonStyle}" ToolTip="Fetch Metadata">
+					<Image Source="/EpisodeGrabber;component/Images/arrow-down-double-2.png" />
+				</Button>
+				<Button Command="commands:MainWindow.RefreshCommand" Style="{StaticResource ButtonStyle}" ToolTip="Refresh">
+					<Image Source="/EpisodeGrabber;component/Images/view-refresh-3.png" />
+				</Button>
+				<Button Command="commands:MainWindow.Download" Style="{StaticResource ButtonStyle}" ToolTip="Download Episode">
+					<Image Source="/EpisodeGrabber;component/Images/download.png" />
+				</Button>
+				<Separator />
+				<Button Click="MenuOptions_OpenOptions" Style="{StaticResource ButtonStyle}" ToolTip="Options">
+					<Image Source="/EpisodeGrabber;component/Images/configure-5.png" />
+				</Button>
+				<Separator />
+				<Button Command="commands:MainWindow.ClearLog" Style="{StaticResource ButtonStyle}" ToolTip="Clear Log">
+					<Image Source="/EpisodeGrabber;component/Images/edit-clear-2.png" />
+				</Button>
+			</ToolBar>
+		</ToolBarTray>
+		<TreeView Grid.Row="2" Height="Auto" HorizontalAlignment="Stretch" Name="treeView1" Grid.Column="0" MouseRightButtonDown="TreeView_MouseRightButtonDown" SelectedItemChanged="TreeView_SelectedItemChanged">
+			<TreeView.ContextMenu>
+				<ContextMenu Name="treeContext">
+					<MenuItem Header="Fetch Metadata" Command="commands:MainWindow.FetchMetadata">
+						<MenuItem.Icon>
+							<Image Source="/EpisodeGrabber;component/Images/arrow-down-double-2.png" />
+						</MenuItem.Icon>
+					</MenuItem>
+					<MenuItem Header="Clear Metadata" Command="commands:MainWindow.ClearMetadata" />
+					<MenuItem Header="Create Files" Command="commands:MainWindow.CreateFiles" />
+					<Separator />
+					<MenuItem Header="Download Episode" Command="commands:MainWindow.Download" InputGestureText="Ctrl-D" />
+					<MenuItem Header="Download Backdrops" Command="commands:MainWindow.DownloadBackdrops" Name="menuDownloadBackdrops" />
+					<MenuItem Header="Cancel Download Backdrops" Command="commands:MainWindow.CancelDownloadBackdrops" Name="menuCancelDownloadBackdrops" Visibility="Collapsed" />
+					<Separator />
+					<MenuItem Header="Refresh" Command="commands:MainWindow.RefreshSelectedCommand">
+						<MenuItem.Icon>
+							<Image Source="/EpisodeGrabber;component/Images/view-refresh-3.png" />
+						</MenuItem.Icon>
+					</MenuItem>
+					<Separator />
+					<MenuItem Header="Open Containing Folder" Command="commands:MainWindow.OpenContainingFolder" />
+				</ContextMenu>
+			</TreeView.ContextMenu>
+			<TreeViewItem Header="TV Shows" IsExpanded="True" Name="nodeShows" IsTextSearchEnabled="True" />
+			<TreeViewItem Header="Movies" IsExpanded="True" Name="nodeMovies" IsTextSearchEnabled="True" />
+		</TreeView>
+		<GridSplitter Grid.Row="2" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Stretch" ResizeBehavior="PreviousAndNext" ResizeDirection="Columns" Width="5" Background="#FFBCBCBC"/>
+		<main:TVForm x:Name="tvForm" Grid.Row="2" Grid.Column="2" HorizontalAlignment="Stretch" />
+		<main:MovieForm x:Name="movieForm" Grid.Row="2" Grid.Column="2" HorizontalAlignment="Stretch" />
+		<ScrollViewer Grid.Row="3" Grid.ColumnSpan="3" HorizontalScrollBarVisibility="Auto" Name="logScroller">
+			<TextBlock Name="tbxLog" TextWrapping="Wrap" />
+		</ScrollViewer>
+	</Grid>
+</Window>

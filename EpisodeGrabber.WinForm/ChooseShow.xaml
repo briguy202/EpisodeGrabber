@@ -1,0 +1,27 @@
+﻿<Window x:Class="EpisodeGrabber.ChooseShow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		xmlns:commands="clr-namespace:EpisodeGrabber"
+        Title="Multiple Shows Found" Height="300" Width="300" ShowInTaskbar="False" WindowStartupLocation="CenterScreen">
+	<Window.CommandBindings>
+		<CommandBinding Command="commands:ChooseShow.SelectShow" CanExecute="SelectShow_CanExecute" Executed="Select_Execute" />
+	</Window.CommandBindings>
+    <Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+		<TextBlock Grid.Row="0" Name="txtHeader" TextWrapping="Wrap" Text="%COUNT% shows were found by the name '%NAME%', so please choose from the list of matching shows below." Margin="5" />
+		<DataGrid Grid.Row="1" Name="dgShows" ItemsSource="{Binding}" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single">
+			<DataGrid.Columns>
+				<DataGridTextColumn Header="Name" Width="*" Binding="{Binding Name}" />
+				<DataGridTextColumn Header="Year" Binding="{Binding Created.Year}" />
+			</DataGrid.Columns>
+		</DataGrid>
+		<StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+			<Button Content="OK" IsDefault="True" Height="23" HorizontalAlignment="Right" Name="btnOK" VerticalAlignment="Top" Width="75" Margin="0 0 5 0" Command="commands:ChooseShow.SelectShow" />
+			<Button Content="Cancel" IsCancel="True" Height="23" HorizontalAlignment="Right" Name="btnCancel" VerticalAlignment="Top" Width="75" />
+		</StackPanel>
+	</Grid>
+</Window>
