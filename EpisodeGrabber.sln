@@ -1,6 +1,8 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.31101.0
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EpisodeGrabber.WinForm", "EpisodeGrabber.WinForm\EpisodeGrabber.WinForm.csproj", "{76B17E17-4E12-4F08-9EF9-F17015037005}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EpisodeGrabber.Library", "EpisodeGrabber.Library\EpisodeGrabber.Library.csproj", "{DAE732DF-DBC9-4ED3-8E6B-C27768AF2B99}"
@@ -14,35 +16,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EpisodeGrabber.Library.Test", "EpisodeGrabber.Library.Test\EpisodeGrabber.Library.Test.csproj", "{69707AF6-423C-4BC2-A9EA-87B2DDEA6B30}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommonLibrary.Framework", "..\CommonLibrary\CommonLibrary.Framework\CommonLibrary.Framework.csproj", "{4CDCB2F8-8934-4F4F-83A4-61E0B2C14E99}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommonLibrary.Framework", "..\..\bh.vs.com\Main\CommonLibrary\CommonLibrary.Framework\CommonLibrary.Framework.csproj", "{4CDCB2F8-8934-4F4F-83A4-61E0B2C14E99}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommonLibrary.WPF", "..\CommonLibrary\CommonLibrary.WPF\CommonLibrary.WPF.csproj", "{932D02A6-F95B-4378-816F-5E40AE03C2A6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommonLibrary.WPF", "..\..\bh.vs.com\Main\CommonLibrary\CommonLibrary.WPF\CommonLibrary.WPF.csproj", "{932D02A6-F95B-4378-816F-5E40AE03C2A6}"
 EndProject
 Global
-	GlobalSection(TeamFoundationVersionControl) = preSolution
-		SccNumberOfProjects = 6
-		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
-		SccTeamFoundationServer = https://brianhibma.visualstudio.com/defaultcollection
-		SccLocalPath0 = .
-		SccProjectUniqueName1 = EpisodeGrabber.WinForm\\EpisodeGrabber.WinForm.csproj
-		SccProjectName1 = EpisodeGrabber.WinForm
-		SccLocalPath1 = EpisodeGrabber.WinForm
-		SccProjectUniqueName2 = EpisodeGrabber.Library\\EpisodeGrabber.Library.csproj
-		SccProjectName2 = EpisodeGrabber.Library
-		SccLocalPath2 = EpisodeGrabber.Library
-		SccProjectUniqueName3 = EpisodeGrabber.Library.Test\\EpisodeGrabber.Library.Test.csproj
-		SccProjectName3 = EpisodeGrabber.Library.Test
-		SccLocalPath3 = EpisodeGrabber.Library.Test
-		SccProjectUniqueName4 = ..\\CommonLibrary\\CommonLibrary.Framework\\CommonLibrary.Framework.csproj
-		SccProjectName4 = ../CommonLibrary/CommonLibrary.Framework
-		SccLocalPath4 = ..\\CommonLibrary\\CommonLibrary.Framework
-		SccProjectUniqueName5 = ..\\CommonLibrary\\CommonLibrary.WPF\\CommonLibrary.WPF.csproj
-		SccProjectName5 = ../CommonLibrary/CommonLibrary.WPF
-		SccLocalPath5 = ..\\CommonLibrary\\CommonLibrary.WPF
-	EndGlobalSection
-	GlobalSection(TestCaseManagementSettings) = postSolution
-		CategoryFile = EpisodeGrabber.vsmdi
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -105,5 +83,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(TestCaseManagementSettings) = postSolution
+		CategoryFile = EpisodeGrabber.vsmdi
 	EndGlobalSection
 EndGlobal

@@ -233,12 +233,12 @@
     <WCFMetadata Include="Service References\" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\CommonLibrary\CommonLibrary.Framework\CommonLibrary.Framework.csproj">
-      <Project>{4CDCB2F8-8934-4F4F-83A4-61E0B2C14E99}</Project>
+    <ProjectReference Include="..\..\..\bh.vs.com\Main\CommonLibrary\CommonLibrary.Framework\CommonLibrary.Framework.csproj">
+      <Project>{4cdcb2f8-8934-4f4f-83a4-61e0b2c14e99}</Project>
       <Name>CommonLibrary.Framework</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\CommonLibrary\CommonLibrary.WPF\CommonLibrary.WPF.csproj">
-      <Project>{932D02A6-F95B-4378-816F-5E40AE03C2A6}</Project>
+    <ProjectReference Include="..\..\..\bh.vs.com\Main\CommonLibrary\CommonLibrary.WPF\CommonLibrary.WPF.csproj">
+      <Project>{932d02a6-f95b-4378-816f-5e40ae03c2a6}</Project>
       <Name>CommonLibrary.WPF</Name>
     </ProjectReference>
     <ProjectReference Include="..\EpisodeGrabber.Library\EpisodeGrabber.Library.csproj">

@@ -71,7 +71,7 @@
     <Compile Include="Services\ShowServiceTests.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\CommonLibrary\CommonLibrary.Framework\CommonLibrary.Framework.csproj">
+    <ProjectReference Include="..\..\..\bh.vs.com\Main\CommonLibrary\CommonLibrary.Framework\CommonLibrary.Framework.csproj">
       <Project>{4cdcb2f8-8934-4f4f-83a4-61e0b2c14e99}</Project>
       <Name>CommonLibrary.Framework</Name>
     </ProjectReference>

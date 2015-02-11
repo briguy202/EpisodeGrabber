@@ -24,7 +24,7 @@ namespace EpisodeGrabber.Controls.Options {
 		#endregion
 
 		#region Declarations
-		private ObservableCollection<string> DefaultMediaTypes = new ObservableCollection<string>() { "avi", "divx", "m4v", "mpeg" };
+		private ObservableCollection<string> DefaultMediaTypes = new ObservableCollection<string>() { "avi", "divx", "m4v", "mpeg", "mp4" };
 		#endregion
 
 		#region Constructors
