@@ -73,6 +73,7 @@ namespace EpisodeGrabber.Library.DAO {
 						Season season = show.Seasons.SingleOrDefault((s) => s.Number == seasonNumber);
 						if (season == null) {
 							season = new Season();
+							season.ID = int.Parse(string.Concat(show.ID, seasonNumber));
 							season.Number = seasonNumber;
 							season.Name = string.Format("Season {0}", seasonNumber);
 							show.Seasons.Add(season);

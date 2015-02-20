@@ -259,7 +259,10 @@ namespace EpisodeGrabber {
 		}
 
 		private void AddNode(TreeViewItem parent, TreeViewItem node, List<string> expandedIDs, int index) {
-			if (expandedIDs.Contains(((EntityBase)node.Tag).UniqueID)) {
+			var nodeUniqueID = ((EntityBase)node.Tag).UniqueID;
+			TraceManager.Trace(string.Format("Evaluating node expansion: expanding if {0} is in {1}.", nodeUniqueID, expandedIDs.Join(", ")), TraceVerbosity.Verbose);
+			if (expandedIDs.Contains(nodeUniqueID)) {
+				TraceManager.Trace(string.Format("Found node expansion match, expanding {0}.", nodeUniqueID), TraceVerbosity.Verbose);
 				node.IsExpanded = true;
 			}
 

@@ -113,13 +113,9 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\bh.vs.com\Main\CommonLibrary\CommonLibrary.Framework\CommonLibrary.Framework.csproj">
+    <ProjectReference Include="..\..\CommonLibrary\CommonLibrary.Framework\CommonLibrary.Framework.csproj">
       <Project>{4cdcb2f8-8934-4f4f-83a4-61e0b2c14e99}</Project>
       <Name>CommonLibrary.Framework</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\..\bh.vs.com\Main\CommonLibrary\CommonLibrary.WPF\CommonLibrary.WPF.csproj">
-      <Project>{932d02a6-f95b-4378-816f-5e40ae03c2a6}</Project>
-      <Name>CommonLibrary.WPF</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
